@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Secret Word</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14121f;--panel:#1f1c30;--ink:#eeeaff;--muted:#a39fc4;--pur:#a073f5;--gre:#22c55e;--yel:#eab308;--red:#ef4444;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Outfit",system-ui,sans-serif;display:flex;justify-content:center}
+main{width:100%;max-width:480px;padding:24px 16px 40px}
+h1{margin:0 0 4px;font-size:28px;text-align:center}
+.sub{margin:0 0 16px;color:var(--muted);font-size:15px;text-align:center}
+.row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+input{font:inherit;font-size:20px;width:230px;padding:10px 12px;border-radius:8px;border:2px solid var(--pur);background:transparent;color:var(--ink);text-align:center;text-transform:lowercase}
+button{font:inherit;font-weight:600;padding:10px 18px;border-radius:8px;border:0;background:var(--pur);color:#1a1033;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:2px solid var(--muted)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.theme{display:block;width:fit-content;margin:0 auto 12px;background:var(--panel);border:2px solid var(--pur);border-radius:20px;padding:6px 16px;font-weight:700;font-size:18px}
+select{font:inherit;font-size:16px;padding:8px 12px;border-radius:8px;border:2px solid var(--muted);background:var(--panel);color:var(--ink)}
+#msg{min-height:26px;font-weight:600;margin:0 0 10px;text-align:center}
+#stat{color:var(--muted);font-size:14px;text-align:center;margin-bottom:10px}
+.g{position:relative;background:var(--panel);border-radius:8px;margin:6px 0;height:40px;overflow:hidden}
+.g .bar{position:absolute;inset:0 auto 0 0;opacity:.85}
+.g .t{position:relative;display:flex;justify-content:space-between;align-items:center;height:100%;padding:0 12px;font-weight:700;color:#fff;text-shadow:0 1px 2px #0008}
+.g.last{outline:3px solid var(--ink);outline-offset:-3px}
+.g.hint .w::after{content:" (hint)";font-weight:400;font-size:12px}
+.lab{color:var(--muted);font-size:13px;margin:12px 0 2px}
+#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10}
+</style>
+</head>
+<body>
+<main>
+  <h1>Secret Word</h1>
+  <p class="sub">Each round has a theme. Guess the secret word from that theme: each guess shows how close its meaning is, and rank 1 is the secret word.</p>
+  <div class="row"><label for="cat" style="align-self:center;color:var(--muted);font-size:14px">Category</label><select id="cat" aria-label="Category"></select></div>
+  <div class="theme" id="themeLabel"></div>
+  <div class="row"><input id="g" autocomplete="off" autocapitalize="none" aria-label="Your guess"><button id="go">Guess</button></div>
+  <div id="msg" role="status"></div>
+  <div class="row"><button class="ghost" id="new">New word</button><button class="ghost" id="hint">Hint</button><button class="ghost" id="give">Give up</button></div>
+  <div id="stat"></div>
+  <div id="last"></div>
+  <div class="lab" id="lab" hidden>All guesses, closest first</div>
+  <div id="list"></div>
+</main>
+<script>
+const TOPICS=[
+"cat kitten purr whiskers fur tail paw claw dog puppy bark leash bone fetch walk pet vet rabbit carrot hamster mouse cheese cage bird parrot fish tank turtle goldfish aquarium canary budgie kennel collar treat groom adopt shelter guinea hutch",
+"farm farmer barn tractor field crop wheat corn harvest cow milk cream butter cheese sheep wool lamb goat pig mud horse saddle donkey chicken egg rooster duck pond orchard meadow scarecrow hay stable plow dairy poultry turkey shepherd barnyard fence",
+"jungle safari lion tiger leopard cheetah mane roar elephant trunk tusk giraffe zebra stripes hippo rhino monkey ape gorilla banana bear honey wolf fox deer antler forest hunt predator savanna cub herd pack prey claw fang zoo antelope buffalo kangaroo panda koala crocodile snake",
+"ocean sea wave tide beach sand shell crab lobster fish shark whale dolphin octopus squid jellyfish coral reef diver boat ship sail anchor captain pirate treasure island lighthouse harbor surf swim snorkel dive lifeguard seaweed pearl oyster seal walrus penguin iceberg current salt",
+"bird feather wing nest egg beak eagle hawk owl crow dove swan duck penguin parrot fly sky cloud air wind balloon kite plane pilot airport helicopter rocket flock migrate chirp tweet hatch robin sparrow peacock flamingo pelican seagull",
+"weather sun sunny hot heat summer warm cloud cloudy rain storm thunder lightning wind windy tornado hurricane flood snow ice frost cold winter freezing fog mist rainbow season forecast temperature umbrella drizzle shower puddle thunderstorm blizzard drought humid breeze climate",
+"plant seed soil root stem leaf branch tree forest wood log bark flower petal rose tulip garden grass lawn bush fruit vegetable weed bloom spring pollen bee honey sprout bud fern moss cactus bamboo palm oak pine maple orchid daisy lily",
+"fruit apple pear peach plum cherry grape berry strawberry banana mango pineapple orange lemon lime melon watermelon coconut juice sweet sour seed peel tree kiwi papaya guava durian rambutan apricot raspberry blueberry cranberry avocado fig date",
+"food meal breakfast lunch dinner snack menu restaurant waiter chef cook recipe kitchen bread toast butter jam cheese egg bacon sandwich pizza burger fries pasta rice soup salad steak chicken noodles sushi curry taco sausage omelet pancake cereal yogurt fried baked roast grill",
+"sugar sweet candy chocolate cake cookie dessert cream honey coffee tea cup mug milk juice soda water bottle wine beer drink thirsty lollipop pudding donut brownie pie syrup caramel milkshake smoothie lemonade",
+"kitchen oven stove pan pot knife fork spoon plate bowl dish glass cup fridge freezer sink table chair cook bake fry boil steam recipe apron kettle toaster blender whisk spatula ladle tray grater colander microwave teapot cutlery",
+"body head hair face eye ear nose mouth lip tooth tongue neck shoulder arm elbow hand finger thumb chest stomach back leg knee foot toe skin bone muscle heart brain blood wrist ankle thigh waist chin cheek eyebrow eyelash fingernail palm heel spine",
+"health doctor nurse hospital clinic medicine pill vaccine sick fever cough cold pain hurt wound bandage surgery patient ambulance dentist tooth healthy exercise sleep fitness diet vitamin allergy flu headache bruise cure rest hygiene mask",
+"family mother father mom dad parent baby child kid boy girl son daughter brother sister grandmother grandfather uncle aunt cousin husband wife marriage wedding love home relative twin nephew niece orphan household neighbor generation ancestor",
+"person people man woman king queen prince princess royal crown throne palace castle knight sword dragon wizard magic witch fairy giant hero villain story emperor empire soldier army battle armor shield arrow archer pirate ninja ghost monster",
+"school teacher student class lesson homework exam test grade book pencil pen paper notebook desk board chalk library learn study read write math science history kindergarten university college diploma degree graduate scholar professor recess uniform backpack",
+"work job boss office meeting company business salary money bank cash coin dollar price buy sell shop market store customer sale cheap expensive rich poor career interview resume manager employee worker invest profit loan budget tax",
+"house home room kitchen bedroom bathroom door window wall roof floor stairs bed pillow blanket sleep dream sofa couch chair table lamp carpet curtain garden fence key lock attic basement garage balcony porch chimney mirror towel shower bathtub",
+"clothes shirt pants jeans dress skirt shoes boots sandals socks hat cap coat jacket sweater scarf glove belt pocket button zipper ring necklace jewelry gold silver diamond fashion uniform costume pajamas underwear swimsuit sneakers slippers sandal hoodie tie suit bracelet",
+"car engine wheel road highway driver truck bus train station track ticket bicycle motorcycle taxi traffic street bridge tunnel airport plane ship boat ferry fuel speed scooter subway tram parachute sail harbor parking license helmet",
+"city town village street building tower skyscraper castle palace church temple mosque museum library hospital school park playground market mall hotel restaurant cinema theater bank avenue plaza fountain statue stadium bakery pharmacy police",
+"sport game team player coach goal score point win lose champion trophy medal stadium ball football soccer basketball baseball tennis golf swim swimming run race jump badminton volleyball cricket rugby hockey cycling boxing karate gymnastics archery referee whistle",
+"music song sing singer voice band guitar piano drum violin concert dance movie film actor actress theater stage paint picture photo camera artist museum poem story melody rhythm lyrics album radio headphones orchestra trumpet flute saxophone microphone opera",
+"computer laptop phone screen keyboard mouse internet website email game video camera robot machine battery electric power light bulb button wire cable software tablet printer router charger speaker drone satellite signal password download app",
+"science experiment lab atom energy gravity planet earth moon sun star galaxy space rocket astronaut telescope orbit comet alien fire water air asteroid meteor nebula universe mars jupiter saturn venus mercury eclipse",
+"feeling happy glad joy smile laugh fun sad cry tears angry mad fear scared brave proud shy lonely worry calm peace love hate kind excited nervous jealous grateful embarrassed surprised bored tired hope trust anxious curious",
+"time clock watch hour minute second day night morning noon evening week weekend month year today tomorrow yesterday calendar birthday holiday season dawn dusk midnight sunrise sunset decade century past future moment",
+"travel trip holiday vacation hotel beach island passport suitcase ticket tourist map flight airport adventure mountain hike camping tent compass guide journey explore souvenir luggage cruise airline visa border resort backpack destination",
+"color red blue green yellow orange purple pink black white gray brown circle square triangle line round shape pattern paint crimson turquoise indigo magenta bronze rainbow dark light bright",
+"insect ant bee wasp fly mosquito butterfly moth beetle ladybug spider web cricket grasshopper caterpillar cocoon wings sting buzz hive",
+"toy doll teddy puzzle blocks lego cards chess dice board game puppet kite balloon swing slide playground marbles bicycle scooter",
+"hammer nail screw saw drill wrench ladder toolbox paint brush rope shovel rake bucket",
+"job chef baker farmer teacher doctor nurse pilot driver police firefighter engineer artist writer singer actor builder carpenter plumber dentist",
+"country china japan india korea thailand malaysia singapore indonesia australia america canada brazil mexico france germany england egypt africa asia europe",
+"mountain hill valley cliff cave volcano lava river lake waterfall stream pond canyon desert dune oasis glacier",
+"party birthday gift present cake candle balloon festival fireworks parade wedding holiday christmas easter halloween costume",
+"money wallet purse cash coin price discount receipt cart basket supermarket mall bakery cashier bargain",
+"number zero one two three four five ten hundred thousand add subtract multiply divide count equal half double",
+"garden hose sprinkler greenhouse compost fertilizer scarecrow hedge pathway swing bench flowerbed butterfly bee watering"].map(t=>t.split(" "));
+const NAMES=["Pets", "Farm", "Wild animals", "Ocean", "Birds and flying", "Weather", "Plants", "Fruit", "Meals", "Sweets and drinks", "Kitchen", "The body", "Health", "Family", "People and royalty", "School", "Work and money", "Home", "Clothes", "Transport", "City places", "Sports", "Music and arts", "Technology", "Science and space", "Feelings", "Time", "Travel", "Colors and shapes", "Insects", "Games and toys", "Tools", "Jobs", "Countries", "Landscapes", "Celebrations", "Shopping", "Numbers", "Garden"];
+const DICT=[...new Set(TOPICS.flat())];
+const $=id=>document.getElementById(id);
+const hash=s=>{let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h};
+let secret,rankOf,order,guesses,over,hints;
+function buildRanks(sec){
+  const pos=TOPICS.map(t=>t.indexOf(sec));
+  const scored=DICT.map(w=>{
+    let best=Infinity;
+    TOPICS.forEach((t,k)=>{const i=pos[k];if(i<0)return;const j=t.indexOf(w);if(j>=0)best=Math.min(best,Math.abs(i-j))});
+    const sc=w===sec?-1:(best<Infinity?best:90+hash(w+sec)%90);
+    return [w,sc,hash(sec+w)];
+  }).sort((a,b)=>a[1]-b[1]||a[2]-b[2]);
+  rankOf={};scored.forEach((x,i)=>rankOf[x[0]]=i+1);order=scored.map(x=>x[0]);
+}
+function row(g,last){
+  const r=g.r,w=Math.max(4,100*(1-Math.log(r)/Math.log(DICT.length)));
+  const col=r<=40?"var(--gre)":r<=300?"var(--yel)":"var(--red)";
+  return `<div class="g${last?" last":""}${g.hint?" hint":""}"><div class="bar" style="width:${w}%;background:${col}"></div><div class="t"><span class="w">${g.w}</span><span>${r}</span></div></div>`;
+}
+function draw(){
+  const lastG=guesses[guesses.length-1];
+  $("last").innerHTML=lastG?row(lastG,true):"";
+  const sorted=[...guesses].sort((a,b)=>a.r-b.r);
+  $("lab").hidden=!guesses.length;
+  $("list").innerHTML=sorted.map(g=>row(g,false)).join("");
+  $("stat").textContent=guesses.length?`Guesses: ${guesses.filter(g=>!g.hint).length}  |  Hints: ${hints}`:"";
+}
+function start(){
+  const v=$("cat").value;
+  const ti=v==="any"?Math.floor(Math.random()*TOPICS.length):+v;
+  const pool=TOPICS[ti].filter(w=>w.length>=4);
+  secret=pool[Math.floor(Math.random()*pool.length)];
+  $("themeLabel").textContent="Theme: "+NAMES[ti];
+  buildRanks(secret);guesses=[];over=false;hints=0;
+  $("msg").textContent="";$("g").value="";$("g").disabled=false;$("go").disabled=false;$("hint").disabled=false;
+  draw();$("g").focus();
+}
+function win(n){
+  over=true;$("g").disabled=true;$("go").disabled=true;$("hint").disabled=true;
+  $("msg").textContent=`You found it: ${secret}! ${n} guess${n===1?"":"es"}, ${hints} hint${hints===1?"":"s"}.`;
+  confetti();
+}
+function guess(){
+  if(over)return;
+  let w=$("g").value.trim().toLowerCase();
+  if(!w)return;
+  if(!rankOf[w]&&w.endsWith("s")&&rankOf[w.slice(0,-1)])w=w.slice(0,-1);
+  if(!rankOf[w]){$("msg").textContent="That word is not in my word list yet. Try another word.";return}
+  if(guesses.some(g=>g.w===w)){$("msg").textContent="You already tried that word.";return}
+  guesses.push({w,r:rankOf[w],hint:false});$("g").value="";$("msg").textContent="";draw();
+  if(rankOf[w]===1)win(guesses.filter(g=>!g.hint).length);else $("g").focus();
+}
+function giveHint(){
+  if(over)return;
+  const best=guesses.length?Math.min(...guesses.map(g=>g.r)):Infinity;
+  let r=best===Infinity?60:Math.max(2,Math.floor(best/2));
+  while(r<order.length&&guesses.some(g=>g.w===order[r-1]))r++;
+  if(r>=order.length)return;
+  hints++;guesses.push({w:order[r-1],r,hint:true});draw();
+}
+function giveUp(){
+  if(over)return;
+  over=true;$("g").disabled=true;$("go").disabled=true;$("hint").disabled=true;
+  $("msg").textContent=`The word was "${secret}". Closest words: ${order.slice(1,11).join(", ")}.`;
+}
+function confetti(){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  const c=document.createElement("canvas");c.id="confetti";c.width=innerWidth;c.height=innerHeight;document.body.append(c);
+  const x=c.getContext("2d"),cols=[0,45,150,200,260,320].map(h=>`hsl(${h} 85% 55%)`);
+  const ps=Array.from({length:150},()=>({x:innerWidth/2+(Math.random()-.5)*160,y:innerHeight*.35,vx:(Math.random()-.5)*15,vy:-Math.random()*13-4,s:6+Math.random()*6,r:Math.random()*6,vr:(Math.random()-.5)*.4,c:cols[Math.floor(Math.random()*cols.length)]}));
+  let t=0;
+  (function f(){
+    x.clearRect(0,0,c.width,c.height);t++;
+    ps.forEach(p=>{p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.vx*=.99;p.r+=p.vr;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()});
+    if(t<160)requestAnimationFrame(f);else c.remove();
+  })();
+}
+$("cat").innerHTML='<option value="any">Any theme (random)</option>'+NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join("");
+$("cat").onchange=start;
+$("go").onclick=guess;
+$("g").onkeydown=e=>{if(e.key==="Enter")guess()};
+$("hint").onclick=giveHint;
+$("give").onclick=giveUp;
+$("new").onclick=start;
+start();
+</script>
+</body>
+</html>
